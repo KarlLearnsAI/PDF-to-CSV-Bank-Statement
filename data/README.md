@@ -1,0 +1,1 @@
+Just put your Traderepublik .pdf banks statement into this folder.
