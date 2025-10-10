@@ -11,6 +11,10 @@ def format_k(x):
 def main():
     df = pd.read_csv("data/processed_transactions.csv", parse_dates=["Date"])
 
+    if df.empty:
+        print("Analysis complete: No data to analyze.")
+        return
+
     # derive a month period
     df["Month"] = df["Date"].dt.to_period("M").dt.to_timestamp()
 
@@ -27,15 +31,16 @@ def main():
     width = 0.25
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    bars1 = ax.bar(x - width, summary["Income"],   width)
-    bars2 = ax.bar(x,       summary["Outcome"],  width)
-    bars3 = ax.bar(x + width, summary["Net"],     width)
+    bars1 = ax.bar(x - width, summary["Income"],   width, label='Income')
+    bars2 = ax.bar(x,       summary["Outcome"],  width, label='Outcome')
+    bars3 = ax.bar(x + width, summary["Net"],     width, label='Net')
 
     # x-axis labels
     ax.set_xticks(x)
     ax.set_xticklabels([m.strftime("%b %Y") for m in months], rotation=45, ha="right")
     ax.set_ylabel("Amount (€)")
     ax.set_title("Monthly Income, Outcome, and Net")
+    ax.legend()
 
     # annotate each bar
     for bar in [*bars1, *bars2, *bars3]:

@@ -12,6 +12,7 @@ def run_step(script_path: str):
 def main():
     steps = [
         "src/extract_transactions.py",
+        "src/split_transactions.py",      # <-- Add the new splitting script here
         "src/preprocess_transactions.py",
         "src/analyze_transactions.py",
     ]

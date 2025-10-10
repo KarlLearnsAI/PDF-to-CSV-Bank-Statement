@@ -1,5 +1,6 @@
 import pandas as pd
 from datetime import datetime
+import re
 
 MONTH_MAP = {
     "Jan": "Jan", "Feb": "Feb", "März": "Mar", "Mrz": "Mar",
@@ -7,26 +8,92 @@ MONTH_MAP = {
     "Aug": "Aug", "Sept": "Sep", "Okt": "Oct", "Nov": "Nov", "Dez": "Dec"
 }
 
-def parse_date(s: str) -> pd.Timestamp:
-    parts = s.split()
-    if len(parts) != 3:
-        raise ValueError(f"Unexpected date format: {s!r}")
-    day, mon, year = parts
-    mon_key = mon.rstrip(".")
-    if mon_key not in MONTH_MAP:
-        raise ValueError(f"Unknown month {mon_key!r}")
-    mon_abbrev = MONTH_MAP[mon_key]
-    dt_str = f"{day} {mon_abbrev} {year}"
-    return datetime.strptime(dt_str, "%d %b %Y")
+def to_float(s: str) -> float:
+    """Converts a European-formatted currency string to a clean float."""
+    if not isinstance(s, str): return 0.0
+    clean = s.replace("€", "").replace(".", "").replace(",", ".").strip()
+    try:
+        return float(clean)
+    except (ValueError, TypeError):
+        return 0.0
+
+def parse_transaction_text(text: str) -> dict:
+    """
+    Parses a single line of transaction text into a structured dictionary.
+    Returns None if the line is not a valid transaction.
+    """
+    months_str = r"(?:Jan|Feb|März|Mrz|Apr|Mai|Jun|Jul|Aug|Sept|Okt|Nov|Dez)"
+    date_re = re.compile(rf"^\s*(\d{{1,2}}\s+{months_str}\.?\s+\d{{4}})")
+    
+    date_match = date_re.match(text)
+    if not date_match:
+        return None  # This is not a valid transaction line.
+    
+    date = date_match.group(1)
+
+    # Find all monetary values in the text.
+    amounts = re.findall(r'(-?[\d\.,]+\s*€)', text)
+    if len(amounts) < 2:
+        return None # Must have at least a cash value and a balance
+
+    balance_val = to_float(amounts[-1])
+    cash_val = to_float(amounts[-2])
+
+    # The description is what's left after removing the date and amounts.
+    description = text.replace(date, '')
+    for amt in amounts:
+        description = description.replace(amt.strip(), '')
+    
+    description = " ".join(description.split())
+    
+    # Exclude any footer text that might have been accidentally included.
+    if "Trade Republic Bank GmbH" in description:
+        description = description.split("Trade Republic Bank GmbH")[0]
+
+    if not description.strip():
+        return None
+
+    cash_in = cash_val if any(kw in description for kw in ["Incoming", "Zinszahlung", "Gutschrift"]) else 0.0
+    cash_out = 0.0 if cash_in > 0 else cash_val
+    
+    return {
+        "Date": date,
+        "Type": description.split(' ')[0],
+        "Description": description,
+        "Cash In": cash_in,
+        "Cash Out": cash_out,
+        "Total Balance": balance_val,
+    }
 
 def main():
-    csv_in = "data/raw_transactions.csv"
-    df = pd.read_csv(csv_in)
+    csv_in = "data/splitted_raw_transactions.csv"
+    try:
+        df = pd.read_csv(csv_in)
+    except FileNotFoundError:
+        print(f"Input file not found: {csv_in}. Cannot preprocess.")
+        pd.DataFrame().to_csv("data/processed_transactions.csv", index=False)
+        return
 
-    df["Date"] = df["Date"].apply(parse_date)
-    print(f"Successfully preprocessed and saved {len(df)} transactions")
-    out_csv = "data/processed_transactions.csv"
-    df.to_csv(out_csv, index=False)
+    processed_data = []
+    if not df.empty:
+        for text in df['TransactionText']:
+            parsed = parse_transaction_text(text)
+            if parsed:
+                processed_data.append(parsed)
+    
+    final_df = pd.DataFrame(processed_data)
+    
+    if not final_df.empty:
+        # Convert German month abbreviations to English for date parsing
+        for ger, eng in MONTH_MAP.items():
+            final_df['Date'] = final_df['Date'].str.replace(ger, eng)
+        
+        # Use a flexible date format
+        final_df["Date"] = pd.to_datetime(final_df["Date"].str.replace(r'\.', '', regex=True), format="%d %b %Y", errors='coerce')
+        final_df.dropna(subset=["Date"], inplace=True)
+
+    print(f"Successfully preprocessed and saved {len(final_df)} transactions")
+    final_df.to_csv("data/processed_transactions.csv", index=False)
 
 if __name__ == "__main__":
     main()
