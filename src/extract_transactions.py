@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import re
+import sys
 import logging
 from typing import List, Dict, Any
 import pdfplumber
@@ -132,7 +133,8 @@ def parse_pdf_to_df(pdf_path: str) -> pd.DataFrame:
     return df
 
 def main():
-    df = parse_pdf_to_df("data/statement.pdf")
+    pdf_path = sys.argv[1] if len(sys.argv) > 1 else "data/statement.pdf"
+    df = parse_pdf_to_df(pdf_path)
     print(f"\nSuccessfully read and extracted {len(df)} unique transactions")
     if df.empty:
         pd.DataFrame(columns=["Date", "Type", "Description", "Cash In", "Cash Out", "Total Balance"]).to_csv("data/raw_transactions.csv", index=False)
