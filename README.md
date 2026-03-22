@@ -1,8 +1,12 @@
 # Simple **fully local** PDF-to-CSV Bank Statement Converter
 ### Tested PDF to CSV Conversions
 - Bank of America (US)
+   - Debit Card
+   - Credit Card
 - Traderpublik (Germany)
+   - Debit Card
 - Commerzbank (Germany)
+   - Debit Card
 
 ## How to use this application
 

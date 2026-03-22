@@ -40,7 +40,11 @@ def print_transactions(df):
 
 def main():
     csv_path = sys.argv[1] if len(sys.argv) > 1 else "data/output/processed_transactions.csv"
-    df = pd.read_csv(csv_path, parse_dates=["Date"])
+    try:
+        df = pd.read_csv(csv_path, parse_dates=["Date"])
+    except (pd.errors.EmptyDataError, FileNotFoundError):
+        print("No transactions found.")
+        return
 
     if df.empty:
         print("No transactions found.")

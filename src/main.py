@@ -11,8 +11,11 @@ def detect_bank(pdf_path: str) -> str:
         with pdfplumber.open(pdf_path) as pdf:
             if pdf.pages:
                 text = pdf.pages[0].extract_text() or ""
-                if "COMMERZBANK" in text.upper() or "Kontoauszug" in text:
+                upper = text.upper()
+                if "COMMERZBANK" in upper or "Kontoauszug" in text:
                     return "commerzbank"
+                if "BANK OF AMERICA" in upper:
+                    return "boa"
     except Exception:
         pass
     return "trade_republic"
@@ -55,6 +58,9 @@ def main():
 
     if bank == "commerzbank":
         run_step("src/extract_commerzbank.py", [pdf_path, output_csv])
+        run_step("src/analyze_transactions.py", [output_csv])
+    elif bank == "boa":
+        run_step("src/extract_boa.py", [pdf_path, output_csv])
         run_step("src/analyze_transactions.py", [output_csv])
     else:
         run_step("src/extract_transactions.py", [pdf_path])
