@@ -1,0 +1,1 @@
+Just put your Traderepublik/Commerzbank PDF banks statement into this /input folder.
