@@ -1,29 +1,14 @@
-import pandas as pd
-from datetime import datetime
+import sys
 import re
-
-MONTH_MAP = {
-    "Jan": "Jan", "Feb": "Feb", "März": "Mar", "Mrz": "Mar",
-    "Apr": "Apr", "Mai": "May", "Jun": "Jun", "Jul": "Jul",
-    "Aug": "Aug", "Sept": "Sep", "Okt": "Oct", "Nov": "Nov", "Dez": "Dec"
-}
-
-def to_float(s: str) -> float:
-    """Converts a European-formatted currency string to a clean float."""
-    if not isinstance(s, str): return 0.0
-    clean = s.replace("€", "").replace(".", "").replace(",", ".").strip()
-    try:
-        return float(clean)
-    except (ValueError, TypeError):
-        return 0.0
+import pandas as pd
+from common import to_float, MONTHS_PATTERN, MONTH_MAP, INCOME_KEYWORDS
 
 def parse_transaction_text(text: str) -> dict:
     """
     Parses a single line of transaction text into a structured dictionary.
     Returns None if the line is not a valid transaction.
     """
-    months_str = r"(?:Jan|Feb|März|Mrz|Apr|Mai|Jun|Jul|Aug|Sept|Okt|Nov|Dez)"
-    date_re = re.compile(rf"^\s*(\d{{1,2}}\s+{months_str}\.?\s+\d{{4}})")
+    date_re = re.compile(rf"^\s*(\d{{1,2}}\s+{MONTHS_PATTERN}\.?\s+\d{{4}})")
     
     date_match = date_re.match(text)
     if not date_match:
@@ -53,7 +38,7 @@ def parse_transaction_text(text: str) -> dict:
     if not description.strip():
         return None
 
-    cash_in = cash_val if any(kw in description for kw in ["Incoming", "Zinszahlung", "Gutschrift"]) else 0.0
+    cash_in = cash_val if any(kw in description for kw in INCOME_KEYWORDS) else 0.0
     cash_out = 0.0 if cash_in > 0 else cash_val
     
     return {
@@ -66,12 +51,13 @@ def parse_transaction_text(text: str) -> dict:
     }
 
 def main():
-    csv_in = "data/splitted_raw_transactions.csv"
+    output_csv = sys.argv[1] if len(sys.argv) > 1 else "data/output/processed_transactions.csv"
+    csv_in = "data/temp/splitted_raw_transactions.csv"
     try:
         df = pd.read_csv(csv_in)
     except FileNotFoundError:
         print(f"Input file not found: {csv_in}. Cannot preprocess.")
-        pd.DataFrame().to_csv("data/processed_transactions.csv", index=False)
+        pd.DataFrame().to_csv(output_csv, index=False)
         return
 
     processed_data = []
@@ -80,20 +66,20 @@ def main():
             parsed = parse_transaction_text(text)
             if parsed:
                 processed_data.append(parsed)
-    
+
     final_df = pd.DataFrame(processed_data)
-    
+
     if not final_df.empty:
         # Convert German month abbreviations to English for date parsing
         for ger, eng in MONTH_MAP.items():
             final_df['Date'] = final_df['Date'].str.replace(ger, eng)
-        
+
         # Use a flexible date format
         final_df["Date"] = pd.to_datetime(final_df["Date"].str.replace(r'\.', '', regex=True), format="%d %b %Y", errors='coerce')
         final_df.dropna(subset=["Date"], inplace=True)
 
     print(f"Successfully preprocessed and saved {len(final_df)} transactions")
-    final_df.to_csv("data/processed_transactions.csv", index=False)
+    final_df.to_csv(output_csv, index=False)
 
 if __name__ == "__main__":
     main()

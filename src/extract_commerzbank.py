@@ -6,43 +6,9 @@ import logging
 from datetime import datetime
 import pdfplumber
 import pandas as pd
+from common import to_float, group_words_into_lines
 
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
-
-
-def to_float(s: str) -> float:
-    """Converts European-formatted currency string to float. Handles trailing minus."""
-    if not isinstance(s, str):
-        return 0.0
-    s = s.strip()
-    negative = s.endswith('-')
-    if negative:
-        s = s[:-1]
-    clean = s.replace(".", "").replace(",", ".").strip()
-    try:
-        val = float(clean)
-        return -val if negative else val
-    except (ValueError, TypeError):
-        return 0.0
-
-
-def group_words_into_lines(words):
-    """Group extracted words into lines by Y-position proximity."""
-    lines = []
-    for w in words:
-        placed = False
-        for line in lines:
-            if abs(w["top"] - line["top"]) < 4:
-                line["words"].append(w)
-                placed = True
-                break
-        if not placed:
-            lines.append({"top": w["top"], "words": [w]})
-    lines.sort(key=lambda L: L["top"])
-    for L in lines:
-        L["words"].sort(key=lambda w: w["x0"])
-        L["text"] = " ".join(w["text"] for w in L["words"])
-    return lines
 
 
 def parse_commerzbank_pdf(pdf_path: str) -> pd.DataFrame:
@@ -197,52 +163,16 @@ def parse_commerzbank_pdf(pdf_path: str) -> pd.DataFrame:
     return df
 
 
-def truncate(s, width):
-    """Truncate string to width, adding '..' if truncated."""
-    s = str(s)
-    if len(s) <= width:
-        return s
-    return s[:width - 2] + ".."
-
-
-def print_transactions(df):
-    """Print all transactions in a formatted table."""
-    col_widths = {"Date": 10, "Type": 15, "Description": 30, "Cash In": 10, "Cash Out": 10, "Total Balance": 12}
-    header = "  ".join(col.ljust(col_widths[col]) for col in col_widths)
-    separator = "  ".join("-" * col_widths[col] for col in col_widths)
-
-    print(f"\n{header}")
-    print(separator)
-    for _, row in df.iterrows():
-        date_str = row["Date"].strftime("%d.%m.%Y") if hasattr(row["Date"], "strftime") else str(row["Date"])[:10]
-        cash_in = f'{row["Cash In"]:.2f}' if row["Cash In"] > 0 else ""
-        cash_out = f'{row["Cash Out"]:.2f}' if row["Cash Out"] > 0 else ""
-        balance = f'{row["Total Balance"]:.2f}'
-        line = "  ".join([
-            truncate(date_str, col_widths["Date"]).ljust(col_widths["Date"]),
-            truncate(row["Type"], col_widths["Type"]).ljust(col_widths["Type"]),
-            truncate(row["Description"], col_widths["Description"]).ljust(col_widths["Description"]),
-            cash_in.rjust(col_widths["Cash In"]),
-            cash_out.rjust(col_widths["Cash Out"]),
-            balance.rjust(col_widths["Total Balance"]),
-        ])
-        print(line)
-    print(separator)
-
-
 def main():
-    pdf_path = sys.argv[1] if len(sys.argv) > 1 else "data/statement.pdf"
+    pdf_path = sys.argv[1] if len(sys.argv) > 1 else "data/input/statement.pdf"
+    output_csv = sys.argv[2] if len(sys.argv) > 2 else "data/output/processed_transactions.csv"
     df = parse_commerzbank_pdf(pdf_path)
     print(f"\nExtracted {len(df)} transactions")
     if df.empty:
         pd.DataFrame(columns=["Date", "Type", "Description", "Cash In", "Cash Out", "Total Balance"]).to_csv(
-            "data/processed_transactions.csv", index=False)
+            output_csv, index=False)
     else:
-        df.to_csv("data/processed_transactions.csv", index=False)
-        opening = df["Total Balance"].iloc[0] + df["Cash Out"].iloc[0] - df["Cash In"].iloc[0]
-        print(f"Opening balance: {opening:.2f}")
-        print_transactions(df)
-        print(f"Closing balance: {df['Total Balance'].iloc[-1]:.2f}")
+        df.to_csv(output_csv, index=False)
 
 
 if __name__ == "__main__":

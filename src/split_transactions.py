@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import pandas as pd
 import re
+from common import MONTHS_PATTERN
 
 def split_raw_transactions(input_csv: str, output_csv: str):
     """
@@ -26,8 +27,7 @@ def split_raw_transactions(input_csv: str, output_csv: str):
     # a date pattern like "13 Sept.". The `(?=...)` part is a "positive lookahead",
     # which allows `re.split` to break the string *before* this pattern,
     # keeping the delimiter with the text that follows it.
-    months_str = r"(?:Jan|Feb|März|Mrz|Apr|Mai|Jun|Jul|Aug|Sept|Okt|Nov|Dez)"
-    split_pattern = re.compile(rf"(?=\b\d{{1,2}}\s+{months_str}\.?)")
+    split_pattern = re.compile(rf"(?=\b\d{{1,2}}\s+{MONTHS_PATTERN}\.?)")
 
     for index, row in df.iterrows():
         # Get the year from the original 'Date' column to re-apply it later.
@@ -51,7 +51,7 @@ def split_raw_transactions(input_csv: str, output_csv: str):
             # This handles cases where the year is not already in the split text.
             if year and not re.search(r'\b\d{4}\b', text_part):
                 # Find the month and insert the year after it.
-                text_part = re.sub(rf"({months_str}\.?)", rf"\1 {year}", text_part, 1)
+                text_part = re.sub(rf"({MONTHS_PATTERN}\.?)", rf"\1 {year}", text_part, 1)
 
             all_split_lines.append({"TransactionText": text_part})
 
@@ -63,8 +63,8 @@ def split_raw_transactions(input_csv: str, output_csv: str):
 
 def main():
     split_raw_transactions(
-        input_csv="data/raw_transactions.csv",
-        output_csv="data/splitted_raw_transactions.csv"
+        input_csv="data/temp/raw_transactions.csv",
+        output_csv="data/temp/splitted_raw_transactions.csv"
     )
 
 if __name__ == "__main__":

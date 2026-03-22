@@ -1,62 +1,52 @@
+import sys
 import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
 
-def format_k(x):
-    """Format 1234 → '1.2k', 950 → '950'"""
-    if abs(x) >= 1000:
-        return f"{x/1000:.1f}k"
-    return f"{x:.0f}"
+
+def truncate(s, width):
+    """Truncate string to width, adding '..' if truncated."""
+    s = str(s)
+    if len(s) <= width:
+        return s
+    return s[:width - 2] + ".."
+
+
+def print_transactions(df):
+    """Print all transactions in a formatted table."""
+    col_widths = {"Date": 10, "Type": 15, "Description": 30, "Cash In": 10, "Cash Out": 10, "Total Balance": 12}
+    header = "  ".join(col.ljust(col_widths[col]) for col in col_widths)
+    separator = "  ".join("-" * col_widths[col] for col in col_widths)
+
+    print(f"\n{header}")
+    print(separator)
+    for _, row in df.iterrows():
+        date_str = row["Date"].strftime("%d.%m.%Y") if hasattr(row["Date"], "strftime") else str(row["Date"])[:10]
+        cash_in = f'{row["Cash In"]:.2f}' if row["Cash In"] > 0 else ""
+        cash_out = f'{row["Cash Out"]:.2f}' if row["Cash Out"] > 0 else ""
+        balance = f'{row["Total Balance"]:.2f}'
+        line = "  ".join([
+            truncate(date_str, col_widths["Date"]).ljust(col_widths["Date"]),
+            truncate(row["Type"], col_widths["Type"]).ljust(col_widths["Type"]),
+            truncate(row["Description"], col_widths["Description"]).ljust(col_widths["Description"]),
+            cash_in.rjust(col_widths["Cash In"]),
+            cash_out.rjust(col_widths["Cash Out"]),
+            balance.rjust(col_widths["Total Balance"]),
+        ])
+        print(line)
+    print(separator)
+    print(f"Total Cash In:  {df['Cash In'].sum():.2f}")
+    print(f"Total Cash Out: {df['Cash Out'].sum():.2f}")
+    print(f"Net:            {df['Cash In'].sum() - df['Cash Out'].sum():.2f}")
+
 
 def main():
-    df = pd.read_csv("data/processed_transactions.csv", parse_dates=["Date"])
+    csv_path = sys.argv[1] if len(sys.argv) > 1 else "data/output/processed_transactions.csv"
+    df = pd.read_csv(csv_path, parse_dates=["Date"])
 
     if df.empty:
-        print("Analysis complete: No data to analyze.")
+        print("No transactions found.")
         return
 
-    # derive a month period
-    df["Month"] = df["Date"].dt.to_period("M").dt.to_timestamp()
-
-    # aggregate
-    summary = df.groupby("Month").agg(
-        Income  = ("Cash In", "sum"),
-        Outcome = ("Cash Out", "sum")
-    )
-    summary["Net"] = summary["Income"] - summary["Outcome"]
-
-    # plot
-    months = summary.index.to_pydatetime()
-    x = np.arange(len(months))
-    width = 0.25
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    bars1 = ax.bar(x - width, summary["Income"],   width, label='Income')
-    bars2 = ax.bar(x,       summary["Outcome"],  width, label='Outcome')
-    bars3 = ax.bar(x + width, summary["Net"],     width, label='Net')
-
-    # x-axis labels
-    ax.set_xticks(x)
-    ax.set_xticklabels([m.strftime("%b %Y") for m in months], rotation=45, ha="right")
-    ax.set_ylabel("Amount (€)")
-    ax.set_title("Monthly Income, Outcome, and Net")
-    ax.legend()
-
-    # annotate each bar
-    for bar in [*bars1, *bars2, *bars3]:
-        h = bar.get_height()
-        label = format_k(h)
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            h + (0.01 * summary.values.max()),
-            label,
-            ha="center",
-            va="bottom",
-            fontsize=9
-        )
-    plt.tight_layout()
-    plt.show()
-    print("Analysis complete")
+    print_transactions(df)
 
 if __name__ == "__main__":
     main()

@@ -1,1 +1,1 @@
-Just put your Traderepublik .pdf banks statement into this folder.
+Just put your Traderepublik/Commerzbank PDF banks statement into the /input folder.
